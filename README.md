@@ -1,0 +1,2 @@
+# parallelisme
+TP parallelisme openmp

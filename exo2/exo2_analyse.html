@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>TP Parallélisme - Exo 2</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 850px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #222; }
+  h1 { border-bottom: 2px solid #444; padding-bottom: 0.3rem; }
+  h2 { border-bottom: 1px solid #aaa; padding-bottom: 0.2rem; margin-top: 2rem; }
+  h3 { margin-top: 1.2rem; }
+  code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.95em; }
+  pre { background: #1e1e1e; color: #dcdcdc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.9em; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #ccc; padding: 0.4rem 0.7rem; text-align: right; }
+  th { background: #f5f5f5; }
+  td:first-child, th:first-child { text-align: left; }
+  .chart-container { position: relative; height: 400px; margin: 1.5rem 0; }
+  .info { font-size: 0.92em; color: #555; }
+</style>
+</head>
+<body>
+
+<h1>TP Parallélisme - Exercice 2</h1>
+<p class="info">Gabriel Mazet - L3 Informatique<br>
+Somme des éléments d'une matrice avec OpenMP.</p>
+
+<h2>1. Énoncé</h2>
+<p>On veut calculer la somme des éléments d'une matrice d'entiers avec 4 versions :</p>
+<ol>
+  <li>Version séquentielle (V1).</li>
+  <li>Version parallèle avec sommes partielles dans un tableau, somme finale faite par un seul thread (V2).</li>
+  <li>Version parallèle avec sommes partielles, mais chaque thread ajoute sa somme à la globale en exclusion mutuelle (V3).</li>
+  <li>Version parallèle avec <code>reduction</code> (V4).</li>
+</ol>
+<p>Matrice 10000 × 10000 remplie de 1 (pour éviter les débordements et vérifier le résultat : on doit obtenir 10⁸). Compilation sans optimisation : <code>gcc -O0 -fopenmp exo2.c -o exo2</code>.</p>
+
+<h2>2. Environnement de test</h2>
+<ul>
+  <li><strong>CPU :</strong> Intel Core i7-8650U, 4 cœurs physiques / 8 threads logiques (HyperThreading).</li>
+  <li><strong>Cache :</strong> L1d = 32 Kio, ligne de cache = 64 octets, L2 = 256 Kio, L3 = 8 Mio.</li>
+  <li><strong>Mesures :</strong> <code>omp_get_wtime()</code>, moyenne sur 3 exécutions.</li>
+</ul>
+<p>La matrice fait 10000 × 10000 × 4 octets ≈ 400 Mo, donc largement plus grosse que le L3. À chaque parcours on tape la RAM, le programme est <em>memory-bound</em>.</p>
+
+<h2>3. Ce que j'ai fait pour paralléliser</h2>
+
+<h3>V1 - Séquentielle</h3>
+<p>Double boucle classique, accumulateur en <code>long long</code> (sinon dépassement avec un <code>int</code>). Sert de référence pour comparer.</p>
+
+<h3>V2 - Sommes partielles dans un tableau</h3>
+<p>J'alloue un tableau <code>sommesPartielles</code> de taille <code>nb_thread</code>. Dans la région parallèle, chaque thread calcule sa somme dans une variable locale (<code>sommeLocale</code>) puis écrit le résultat à l'index <code>omp_get_thread_num()</code>. Une fois la région fermée, le thread principal fait la somme du tableau.</p>
+<p><strong>Choix :</strong> j'utilise une variable locale au lieu d'écrire directement dans <code>sommesPartielles[idThread]</code> à chaque itération. Sinon on aurait du <em>false sharing</em> : 8 <code>long long</code> tiennent dans une ligne de 64 octets, donc tous les threads se battraient pour la même ligne de cache.</p>
+
+<h3>V3 - Exclusion mutuelle (<code>critical</code>)</h3>
+<p>Même idée que V2 mais à la fin chaque thread ajoute sa somme locale à <code>sommeTotale</code> (variable partagée) dans un <code>#pragma omp critical</code>. Sans la section critique on aurait une <em>data race</em> : deux threads peuvent lire la même valeur de <code>sommeTotale</code>, ajouter leur part, puis l'un écrase l'autre → on perd des additions.</p>
+<p><strong>Petite optimisation :</strong> j'ai mis <code>nowait</code> sur le <code>#pragma omp for</code>. Comme ça, dès qu'un thread finit son chunk, il rentre direct dans la section critique au lieu d'attendre la barrière implicite. Note : <code>atomic</code> aurait aussi marché vu que c'est juste une addition.</p>
+
+<h3>V4 - Réduction</h3>
+<p>Une seule ligne avec <code>reduction(+:sommeTotale)</code>. OpenMP s'occupe de tout : il crée une copie privée par thread et combine à la fin. C'est la version la plus simple.</p>
+
+<h3>Difficultés rencontrées</h3>
+<ul>
+  <li>Au début j'avais oublié le <code>long long</code> sur la somme et je tombais sur des valeurs négatives à cause du débordement (10⁸ rentre dans un <code>int</code> de justesse mais avec une matrice plus grande ça casserait).</li>
+  <li>J'ai hésité entre <code>atomic</code> et <code>critical</code> pour V3. <code>atomic</code> est plus rapide en théorie mais comme l'opération a lieu une seule fois par thread (pas dans la boucle), la différence est invisible.</li>
+  <li>Penser à initialiser <code>sommeTotale = 0</code> avant chaque appel - sinon on accumule les résultats des appels précédents.</li>
+</ul>
+
+<h2>4. Résultats</h2>
+
+<p>Temps de la version séquentielle (V1) : <strong>0.393 s</strong>.</p>
+
+<table>
+  <thead>
+    <tr><th>Threads</th><th>V2 Partiel (s)</th><th>V3 Mutex (s)</th><th>V4 Reduction (s)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>0.397</td><td>0.399</td><td>0.396</td></tr>
+    <tr><td>2</td><td>0.200</td><td>0.199</td><td>0.198</td></tr>
+    <tr><td>4</td><td>0.118</td><td>0.122</td><td>0.123</td></tr>
+    <tr><td>8</td><td>0.096</td><td>0.087</td><td>0.087</td></tr>
+    <tr><td>16</td><td>0.087</td><td>0.086</td><td>0.088</td></tr>
+  </tbody>
+</table>
+
+<h2>5. Commentaires sur les résultats</h2>
+
+<h3>Les 3 versions parallèles donnent quasi le même temps</h3>
+<p>C'est ce qui m'a le plus surpris au début. En fait, comme on compile en <code>-O0</code>, le compilateur ne vectorise pas et n'optimise pas les boucles. Du coup le coût dominant c'est l'addition + l'accès mémoire, et ces trois opérations sont identiques dans V2/V3/V4. Le seul truc qui change c'est comment on combine les sommes partielles à la fin, et ça représente seulement <code>nb_thread</code> additions face à 10⁸ additions de boucle. C'est complètement négligeable.</p>
+<p>Si on activait <code>-O2</code>, je pense que V4 prendrait plus d'avance car la <code>reduction</code> permet une vectorisation propre (l'accumulateur privé devient un registre SIMD).</p>
+
+<h3>Le scaling sature autour de 4 threads</h3>
+<ul>
+  <li><strong>1 → 2 threads :</strong> on divise le temps par presque 2 (×1.97). Très bon scaling.</li>
+  <li><strong>2 → 4 threads :</strong> ×1.65 seulement. On commence à être limité par la bande passante mémoire (matrice trop grande pour le cache).</li>
+  <li><strong>4 → 8 threads :</strong> ×1.40. Là on passe sur l'HyperThreading. Le gain vient du fait que pendant qu'un thread attend la mémoire, l'autre thread du même cœur peut bosser.</li>
+  <li><strong>8 → 16 threads :</strong> aucun gain (parfois même un peu plus lent). Logique : on n'a que 8 threads logiques, demander 16 ne sert à rien à part rajouter du coût d'ordonnancement.</li>
+</ul>
+
+<h3>Pourquoi le mutex de V3 ne pénalise pas</h3>
+<p>Je pensais que la section critique allait faire perdre du temps mais en fait non. Avec <code>nowait</code>, les <code>nb_thread</code> threads font leurs <code>nb_thread</code> additions en série, ce qui prend quelques microsecondes face à 100 ms de calcul. Le mutex serait dramatique si on l'utilisait <em>dans</em> la boucle (genre <code>sommeTotale += matrice[i*c+j]</code> en critical) - là on sérialise tout et on tue le parallélisme.</p>
+
+<h3>Lequel choisir ?</h3>
+<p>Pour ce problème en <code>-O0</code> les trois se valent. Mais V4 (reduction) reste mon choix par défaut :</p>
+<ul>
+  <li>Une seule ligne, plus simple à lire et à maintenir.</li>
+  <li>Pas d'allocation auxiliaire (V2 doit faire <code>calloc</code>/<code>free</code>).</li>
+  <li>Le combine final est fait en arbre par OpenMP, donc ça scale mieux quand on a beaucoup de threads.</li>
+</ul>
+
+<h2>6. Vérification</h2>
+<p>Toutes les versions retournent <code>somme = 100000000</code> = 10⁸, ce qui est bien le résultat attendu (10000 × 10000 × 1). Pas de débordement grâce au <code>long long</code>.</p>
+
+</body>
+</html>

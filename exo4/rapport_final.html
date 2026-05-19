@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compte Rendu TP : Sac à Dos Parallèle</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        header {
+            border-bottom: 2px solid #3498db;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin: 0;
+        }
+        h2 {
+            color: #3498db;
+            border-left: 5px solid #3498db;
+            padding-left: 10px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #2980b9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .code-block {
+            background: #272822;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: Consolas, monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        .highlight {
+            background-color: #e8f4fd;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .footer {
+            margin-top: 50px;
+            font-size: 0.9em;
+            color: #7f8c8d;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Compte Rendu TP 4 : Problème du Sac à Dos</h1>
+        <p>L3 Informatique - Programmation Parallèle (OpenMP)</p>
+    </header>
+
+    <section>
+        <h2>1. Implémentation Séquentielle</h2>
+        <p>
+            Pour résoudre le problème du sac à dos, on utilise la programmation dynamique. L'idée est de construire une matrice <code>S[objets][capacité]</code>. 
+        </p>
+        <p>
+            <strong>Points importants :</strong>
+            <ul>
+                <li><strong>Mémoire :</strong> Comme les fichiers de test (surtout <code>pb6</code>) sont gros, j'ai alloué la matrice dynamiquement avec <code>malloc</code>. Sinon, on risquait un "Stack Overflow".</li>
+                <li><strong>Vérification :</strong> À la fin du programme, une fonction vérifie que la solution reconstruite (tableau E) correspond bien à l'utilité maximale trouvée dans la matrice.</li>
+                <li><strong>Valgrind :</strong> J'ai passé le code au Memcheck, il n'y a aucune fuite mémoire.</li>
+            </ul>
+        </p>
+    </section>
+
+    <section>
+        <h2>2. Passage en Parallèle avec OpenMP</h2>
+        <p>
+            Dans l'algorithme, chaque ligne dépend de la ligne précédente. On ne peut donc pas paralléliser la boucle extérieure (celle des objets). Par contre, on peut paralléliser le remplissage des colonnes (les capacités) car elles sont indépendantes sur une même ligne.
+        </p>
+        <p>
+            J'ai optimisé la parallélisation en mettant le <code>#pragma omp parallel</code> autour de toutes les boucles plutôt que de le recréer à chaque objet. Ça permet de gagner du temps en évitant de "forker" les threads 96 fois.
+        </p>
+        <div class="code-block">
+#pragma omp parallel
+{
+    // Remplissage de la ligne 0
+    #pragma omp for
+    for (int j = 0; j <= p->capacity; j++) { ... }
+
+    // Remplissage du reste
+    for (int i = 1; i < p->numObj; i++) {
+        #pragma omp for
+        for (int j = 0; j <= p->capacity; j++) {
+            // Calcul de S[i][j]
+        }
+    }
+}
+        </div>
+    </section>
+
+    <section>
+        <h2>3. Résultats et Mesures</h2>
+        <p>Voici les résultats obtenus sur le fichier <code>pb6.txt</code> (96 objets, C=640 400). Les temps sont une moyenne sur 5 lancements.</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Threads</th>
+                    <th>Temps Moyen (s)</th>
+                    <th>Speedup</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Séquentiel</td><td>0.119s</td><td>1.00x</td></tr>
+                <tr><td>2 Threads</td><td>0.084s</td><td>1.41x</td></tr>
+                <tr><td><strong>4 Threads</strong></td><td><strong>0.047s</strong></td><td><strong>2.52x</strong></td></tr>
+                <tr><td>8 Threads</td><td>0.063s</td><td>1.89x</td></tr>
+                <tr><td>16 Threads</td><td>0.057s</td><td>2.10x</td></tr>
+            </tbody>
+        </table>
+
+        <div class="highlight">
+            <p>
+                <strong>Observation :</strong> Le meilleur résultat est obtenu avec 4 threads. Au-delà, le gain n'est pas linéaire et les performances stagnent.
+            </p>
+        </div>
+    </section>
+
+    <section>
+        <h2>4. Analyse et Conclusion</h2>
+        <p>
+            <strong>Pourquoi le speedup n'est pas de 16x avec 16 threads ?</strong><br>
+            Le programme est "Memory Bound". Ça veut dire que le CPU passe plus de temps à attendre que les données arrivent de la RAM qu'à faire les calculs (qui sont juste une addition et un max). À partir d'un certain nombre de threads, le bus mémoire est saturé et ajouter des coeurs n'aide plus.
+        </p>
+        <p>
+            <strong>Petits fichiers (pb1, pb2) :</strong><br>
+            Pour ces fichiers, la version parallèle est plus lente que la séquentielle. C'est normal : le temps de créer les threads est plus long que le calcul lui-même. C'est ce qu'on appelle l'overhead d'OpenMP.
+        </p>
+        <p>
+            <strong>Conclusion :</strong><br>
+            Le TP est fonctionnel et la parallélisation fonctionne bien sur les grosses instances. L'optimisation du pool de threads a permis d'améliorer le speedup global.
+        </p>
+    </section>
+</div>
+
+</body>
+</html>

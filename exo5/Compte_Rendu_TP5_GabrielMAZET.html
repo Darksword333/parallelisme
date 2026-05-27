@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compte Rendu TP 5 : Traitement d'Image Parallèle</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #2d3748;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        header {
+            border-bottom: 3px solid #3182ce;
+            margin-bottom: 35px;
+            padding-bottom: 20px;
+        }
+        h1 {
+            color: #1a365d;
+            margin: 0;
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+        .subtitle {
+            color: #718096;
+            font-size: 1.1rem;
+            margin-top: 5px;
+            margin-bottom: 0;
+        }
+        h2 {
+            color: #3182ce;
+            border-left: 5px solid #3182ce;
+            padding-left: 15px;
+            margin-top: 40px;
+            font-size: 1.5rem;
+        }
+        h3 {
+            color: #2c5282;
+            margin-top: 25px;
+        }
+        p, li {
+            font-size: 1.05rem;
+            color: #4a5568;
+        }
+        ul, ol {
+            margin-bottom: 20px;
+            padding-left: 25px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        code {
+            background: #edf2f7;
+            color: #2d3748;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95em;
+        }
+        pre {
+            background: #1a202c;
+            color: #f7fafc;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.45;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 12px 15px;
+            text-align: center;
+        }
+        th {
+            background-color: #ebf8ff;
+            color: #2b6cb0;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f7fafc;
+        }
+        .highlight {
+            background-color: #ebf8ff;
+            border-left: 4px solid #3182ce;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .chart-container {
+            position: relative;
+            height: 450px;
+            margin: 30px 0;
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .formula {
+            display: block;
+            text-align: center;
+            font-size: 1.25rem;
+            margin: 15px 0;
+            font-weight: bold;
+            color: #1a202c;
+            font-family: 'Times New Roman', Times, serif;
+        }
+        .footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+            color: #a0aec0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Compte Rendu TP 5 : Traitement d'Image</h1>
+        <p class="subtitle">Gabriel Mazet - L3 Informatique - Programmation Parallèle (OpenMP)</p>
+    </header>
+
+    <section>
+        <h2>Présentation du Problème et Algorithmes</h2>
+        <p>
+            L'objectif de ce TP est de paralléliser un traitement d'image complet en C avec OpenMP. Le traitement se fait en deux étapes :
+        </p>
+        <ol>
+            <li>
+                <strong>La conversion en niveaux de gris :</strong> conversion d'une image couleur au format PPM (3 octets par pixel, format <code>P3</code> ASCII) vers une image en niveaux de gris au format PGM (1 octet par pixel, format <code>P2</code> ASCII) selon la formule de luminance :
+                <span class="formula">g = (299 * r + 587 * g + 114 * b) / 1000</span>
+            </li>
+            <li>
+                <strong>L'égalisation d'histogramme :</strong> amélioration du contraste de l'image en niveaux de gris. Dans une image peu contrastée, les pixels se concentrent sur des valeurs proches. L'égalisation permet d'aplanir l'histogramme pour utiliser toute la dynamique disponible (de 0 à 255).
+            </li>
+        </ol>
+        
+        <h3>L'algorithme d'égalisation d'histogramme :</h3>
+        <ul>
+            <li><strong>Histogramme H :</strong> on compte pour chaque niveau de gris <code>i</code> (de 0 à 255) le nombre de pixels qui possèdent cette valeur (noté <code>H[i]</code>).</li>
+            <li><strong>Histogramme cumulé C :</strong> on calcule <code>C[i] = C[i-1] + H[i]</code>, qui représente le nombre de pixels dont la valeur est inférieure ou égale à <code>i</code>.</li>
+            <li><strong>Transformation :</strong> on remplace chaque pixel d'origine de valeur <code>P[i]</code> par sa nouvelle valeur étirée :
+                <span class="formula">P_nouveau[i] = (255 * C[P[i]]) / S</span>
+                où <code>S</code> est le nombre total de pixels de l'image (<code>largeur * hauteur</code>).
+            </li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Stratégie de Parallélisation OpenMP</h2>
+        <p>
+            Afin d'obtenir les meilleures performances possibles, le programme complet a été parallélisé. 
+            Les entrées/sorties (chargement PPM et écriture PGM) restent séquentielles car la lecture de fichiers ASCII n'est pas parallélisable de manière simple en OpenMP.
+        </p>
+
+        <h3>A. Conversion couleur vers niveaux de gris (<code>colorToGreyOmp</code>)</h3>
+        <p>
+            Chaque pixel de l'image couleur est traité de façon totalement indépendante. On utilise une simple directive <code>#pragma omp parallel for</code> sur la boucle linéaire de taille <code>width * height</code>.
+        </p>
+
+        <h3>B. Égalisation d'histogramme (<code>enhanceContrastOmp</code>)</h3>
+        <p>
+            Pour éviter d'enchaîner plusieurs régions parallèles (ce qui génère de l'overhead de création de threads), j'ai encapsulé toute la fonction dans une unique région parallèle <code>#pragma omp parallel</code> :
+        </p>
+        <ol>
+            <li>
+                <strong>Étape 1 : Histogrammes locaux (Évitement de data race).</strong>
+                Si tous les threads incrémentaient directement l'histogramme global partagé <code>H</code>, il y aurait des conflits d'accès (data race). Utiliser une section <code>critical</code> à chaque pixel détruirait les performances. 
+                À la place, chaque thread crée son propre tableau d'histogramme local <code>localH</code> sur sa pile, et remplit cette copie de façon indépendante avec <code>#pragma omp for nowait</code>.
+            </li>
+            <li>
+                <strong>Étape 2 : Fusion (Exclusion mutuelle).</strong>
+                Chaque thread ajoute son histogramme local à l'histogramme global <code>H</code> dans un bloc <code>#pragma omp critical</code>. Comme cette opération n'a lieu qu'une seule fois par thread, l'overhead est complètement négligeable.
+            </li>
+            <li>
+                <strong>Étape 3 : Barrière et Histogramme cumulé.</strong>
+                On insère un <code>#pragma omp barrier</code> pour garantir que tous les threads ont fini de fusionner leurs données dans <code>H</code>. Ensuite, un seul thread calcul l'histogramme cumulé <code>C</code> de manière séquentielle via <code>#pragma omp single</code>.
+            </li>
+            <li>
+                <strong>Étape 4 : Transformation finale.</strong>
+                Les threads se répartissent le calcul de la transformation des pixels de l'image avec un dernier <code>#pragma omp for</code>.
+            </li>
+        </ol>
+
+        <pre>
+void enhanceContrastOmp(GreyImage *image, int numThreads) {
+    int size = image->width * image->height;
+    long long h[256] = {0};
+    long long c[256] = {0};
+    omp_set_num_threads(numThreads);
+    
+    #pragma omp parallel
+    {
+        long long localH[256] = {0};
+        
+        #pragma omp for nowait
+        for (int i = 0; i < size; i++) {
+            localH[image->pixels[i]]++;
+        }
+        
+        #pragma omp critical
+        {
+            for (int k = 0; k < 256; k++) {
+                h[k] += localH[k];
+            }
+        }
+        
+        #pragma omp barrier
+        
+        #pragma omp single
+        {
+            c[0] = h[0];
+            for (int i = 1; i < 256; i++) {
+                c[i] = c[i - 1] + h[i];
+            }
+        } // barrière implicite à la fin du single
+        
+        #pragma omp for
+        for (int i = 0; i < size; i++) {
+            image->pixels[i] = (unsigned char)((255 * (long long)c[image->pixels[i]]) / size);
+        }
+    }
+}
+        </pre>
+    </section>
+
+    <section>
+        <h2>Résultats et Mesures de Performances</h2>
+        <p>
+            Les mesures ont été effectuées sur les 3 images fournies, en prenant la moyenne sur <strong>5 exécutions</strong> par configuration. Les temps indiqués correspondent au temps de calcul pur (conversion en gris + égalisation), excluant les entrées/sorties sur disque.
+        </p>
+
+        <h3>A. Image 0 (299 x 168 px, ~50 kpx)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Configuration</th>
+                    <th>Temps Gris (s)</th>
+                    <th>Temps Contraste (s)</th>
+                    <th>Temps Total (s)</th>
+                    <th>Speedup Gris</th>
+                    <th>Speedup Contraste</th>
+                    <th>Speedup Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Séquentiel</td><td>0.000077</td><td>0.000410</td><td>0.000487</td><td>1.00x</td><td>1.00x</td><td>1.00x</td></tr>
+                <tr><td>1 Thread</td><td>0.000094</td><td>0.000459</td><td>0.000554</td><td>0.82x</td><td>0.89x</td><td>0.88x</td></tr>
+                <tr><td>2 Threads</td><td>0.000147</td><td>0.000224</td><td>0.000371</td><td>0.53x</td><td>1.83x</td><td>1.31x</td></tr>
+                <tr><td>4 Threads</td><td>0.000173</td><td>0.000114</td><td>0.000287</td><td>0.45x</td><td>3.60x</td><td>1.70x</td></tr>
+                <tr><td>8 Threads</td><td>0.001832</td><td>0.005261</td><td>0.007094</td><td>0.04x</td><td>0.08x</td><td>0.07x</td></tr>
+                <tr><td>16 Threads</td><td>0.000541</td><td>0.000387</td><td>0.000929</td><td>0.14x</td><td>1.06x</td><td>0.52x</td></tr>
+            </tbody>
+        </table>
+
+        <h3>B. Image 1 (768 x 512 px, ~393 kpx)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Configuration</th>
+                    <th>Temps Gris (s)</th>
+                    <th>Temps Contraste (s)</th>
+                    <th>Temps Total (s)</th>
+                    <th>Speedup Gris</th>
+                    <th>Speedup Contraste</th>
+                    <th>Speedup Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Séquentiel</td><td>0.000606</td><td>0.003216</td><td>0.003822</td><td>1.00x</td><td>1.00x</td><td>1.00x</td></tr>
+                <tr><td>1 Thread</td><td>0.000627</td><td>0.003197</td><td>0.003825</td><td>0.97x</td><td>1.01x</td><td>1.00x</td></tr>
+                <tr><td>2 Threads</td><td>0.000464</td><td>0.001795</td><td>0.002259</td><td>1.31x</td><td>1.79x</td><td>1.69x</td></tr>
+                <tr><td>4 Threads</td><td>0.000431</td><td>0.001171</td><td>0.001603</td><td>1.41x</td><td>2.75x</td><td>2.38x</td></tr>
+                <tr><td>8 Threads</td><td>0.000413</td><td>0.000661</td><td>0.001074</td><td>1.47x</td><td>4.86x</td><td>3.56x</td></tr>
+                <tr><td>16 Threads</td><td>0.001118</td><td>0.002045</td><td>0.003162</td><td>0.54x</td><td>1.57x</td><td>1.21x</td></tr>
+            </tbody>
+        </table>
+
+        <h3>C. Image 2 (3072 x 2304 px, ~7.08 Mpx)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Configuration</th>
+                    <th>Temps Gris (s)</th>
+                    <th>Temps Contraste (s)</th>
+                    <th>Temps Total (s)</th>
+                    <th>Speedup Gris</th>
+                    <th>Speedup Contraste</th>
+                    <th>Speedup Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Séquentiel</td><td>0.010880</td><td>0.057643</td><td>0.068523</td><td>1.00x</td><td>1.00x</td><td>1.00x</td></tr>
+                <tr><td>1 Thread</td><td>0.010915</td><td>0.057663</td><td>0.068578</td><td>1.00x</td><td>1.00x</td><td>1.00x</td></tr>
+                <tr><td>2 Threads</td><td>0.005776</td><td>0.029034</td><td>0.034809</td><td>1.88x</td><td>1.99x</td><td>1.97x</td></tr>
+                <tr><td>4 Threads</td><td>0.003330</td><td>0.014807</td><td>0.018136</td><td>3.27x</td><td>3.89x</td><td>3.78x</td></tr>
+                <tr><td>8 Threads</td><td>0.003886</td><td>0.013844</td><td>0.017730</td><td>2.80x</td><td>4.16x</td><td>3.86x</td></tr>
+                <tr><td>16 Threads</td><td>0.004678</td><td>0.014814</td><td>0.019492</td><td>2.33x</td><td>3.89x</td><td>3.52x</td></tr>
+            </tbody>
+        </table>
+
+        <div class="chart-container">
+            <canvas id="speedupChart"></canvas>
+        </div>
+    </section>
+
+    <section>
+        <h2>Analyse des performances</h2>
+        
+        <h3>L'impact de la taille des données (Overhead OpenMP)</h3>
+        <p>
+            Pour la toute petite image (<code>image0</code>), on observe que le parallélisme n'est pas du tout efficace au-delà de 4 threads (le speedup s'effondre à 0.07x pour 8 threads). 
+            La raison est simple : le volume de calcul sur 50 000 pixels est extrêmement faible (~0.4 milliseconde). Le coût de création des threads OpenMP et les étapes de synchronisation (notamment les barrières) prennent plus de temps que le calcul lui-même. C'est l'<strong>overhead</strong> d'OpenMP.
+        </p>
+
+        <h3>Scaling et saturation (Image 2)</h3>
+        <p>
+            Pour la grande image (<code>image2</code>, 7.08 millions de pixels), le gain est presque parfaitement linéaire jusqu'à 4 threads (<strong>speedup de 3.78x pour 4 threads</strong>, soit une efficacité parallèle de 94.5%).
+            Cependant, l'accélération sature à 8 threads (3.86x) et régresse avec 16 threads (3.52x). 
+        </p>
+        <p>
+            Cette saturation s'explique par deux phénomènes :
+        </p>
+        <ul>
+            <li>
+                <strong>Nombre de cœurs physiques :</strong> La machine de test possède 4 cœurs physiques et 8 cœurs logiques (HyperThreading). Le gain d'un thread logique par rapport à un cœur physique est limité car ils partagent les mêmes unités d'exécution. Configurer 16 threads sur un processeur doté de seulement 8 threads logiques crée de l'ordonnancement inutile et dégrade le temps global.
+            </li>
+            <li>
+                <strong>Bande passante mémoire (Memory Bound) :</strong> Les opérations de conversion et de transformation de pixels sont très légères en calcul (quelques additions et multiplications) mais manipulent de gros volumes de données. Le bus mémoire est vite saturé par la demande simultanée de tous les cœurs, empêchant une accélération linéaire au-delà des cœurs physiques.
+            </li>
+        </ul>
+        
+        <h3>Efficacité de l'Égalisation vs la Conversion en Gris</h3>
+        <p>
+            On remarque que l'égalisation d'histogramme obtient de meilleurs speedups individuels (jusqu'à 4.16x sur image2) que la conversion en niveaux de gris (maximum 3.27x). 
+            Cela provient du fait que la fonction d'égalisation effectue plus d'opérations locales et profite mieux de l'architecture de région parallèle unique où les variables locales restent au chaud dans les caches L1/L2 des différents processeurs.
+        </p>
+    </section>
+
+    <section>
+        <h2>Conclusion</h2>
+        <p>
+            Ce TP montre qu'OpenMP est une solution redoutablement efficace pour accélérer les traitements d'image à condition que la taille des données soit suffisante pour masquer l'overhead d'initialisation. 
+            Notre approche avec <strong>région parallèle unique</strong> et <strong>réduction manuelle locale</strong> a permis d'optimiser l'égalisation d'histogramme en évitant toute data race sans pour autant introduire de verrous coûteux au sein de la boucle de traitement. Les résultats obtenus sont cohérents avec les caractéristiques matérielles du processeur de test.
+        </p>
+    </section>
+    
+    <div class="footer">
+        Gabriel Mazet - TP de Programmation Parallèle (L3 Informatique) - 2026
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('speedupChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Séquentiel', '1 Thread', '2 Threads', '4 Threads', '8 Threads', '16 Threads'],
+            datasets: [
+                {
+                    label: 'Image 0 (50 kpx)',
+                    data: [1.00, 0.88, 1.31, 1.70, 0.07, 0.52],
+                    borderColor: '#e53e3e',
+                    backgroundColor: 'rgba(229, 62, 62, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.1
+                },
+                {
+                    label: 'Image 1 (393 kpx)',
+                    data: [1.00, 1.00, 1.69, 2.38, 3.56, 1.21],
+                    borderColor: '#dd6b20',
+                    backgroundColor: 'rgba(221, 107, 32, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.1
+                },
+                {
+                    label: 'Image 2 (7.08 Mpx)',
+                    data: [1.00, 1.00, 1.97, 3.78, 3.86, 3.52],
+                    borderColor: '#3182ce',
+                    backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Speedup global en fonction du nombre de threads',
+                    font: {
+                        size: 16,
+                        weight: 'bold'
+                    },
+                    padding: 20
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            },
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Speedup (x)'
+                    },
+                    min: 0,
+                    max: 5,
+                    ticks: {
+                        stepSize: 0.5
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Configuration'
+                    }
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>

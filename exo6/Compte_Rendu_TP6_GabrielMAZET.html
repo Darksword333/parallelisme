@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compte Rendu TP 6 : Parallélisation de l'Algorithme de Dijkstra (OpenMP)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #1a365d;
+            --primary-light: #2b6cb0;
+            --accent: #3182ce;
+            --bg: #f7fafc;
+            --card-bg: #ffffff;
+            --text: #2d3748;
+            --text-muted: #718096;
+            --border: #e2e8f0;
+            --code-bg: #edf2f7;
+            --highlight: #ebf8ff;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 40px auto;
+            background: var(--card-bg);
+            padding: 50px 60px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+
+        header {
+            border-bottom: 4px solid var(--accent);
+            margin-bottom: 40px;
+            padding-bottom: 25px;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin: 0;
+            font-size: 2.4rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            margin-top: 8px;
+            margin-bottom: 0;
+            font-weight: 500;
+        }
+
+        .meta-info {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            padding-top: 15px;
+        }
+
+        .meta-item strong {
+            color: var(--primary-light);
+        }
+
+        h2 {
+            color: var(--primary-light);
+            border-left: 5px solid var(--accent);
+            padding-left: 18px;
+            margin-top: 45px;
+            margin-bottom: 20px;
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        h3 {
+            color: var(--primary);
+            margin-top: 30px;
+            margin-bottom: 12px;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        p, li {
+            font-size: 1.02rem;
+            color: var(--text);
+            text-align: justify;
+        }
+
+        ul, ol {
+            margin-bottom: 25px;
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        code {
+            background: var(--code-bg);
+            color: #b83280;
+            padding: 0.2rem 0.4rem;
+            border-radius: 6px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        pre {
+            background: #1a202c;
+            color: #f7fafc;
+            padding: 25px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+            margin: 20px 0;
+            border: 1px solid #2d3748;
+        }
+
+        .keyword { color: #f56565; }
+        .type { color: #4299e1; }
+        .pragma { color: #ed64a6; }
+        .comment { color: #718096; font-style: italic; }
+        .string { color: #48bb78; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.01);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 14px 16px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #ebf8ff;
+            color: var(--primary-light);
+            font-weight: 700;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fcfdfd;
+        }
+
+        tr:hover {
+            background-color: #f7fafc;
+        }
+
+        .alert {
+            background-color: var(--highlight);
+            border-left: 4px solid var(--accent);
+            padding: 20px 25px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+
+        .alert-title {
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .chart-container {
+            background: #fff;
+            padding: 25px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            height: 400px;
+            position: relative;
+        }
+
+        .formula {
+            display: block;
+            text-align: center;
+            font-size: 1.3rem;
+            margin: 20px 0;
+            font-weight: bold;
+            color: var(--primary);
+            font-family: 'Georgia', serif;
+        }
+
+        .footer {
+            margin-top: 60px;
+            padding-top: 25px;
+            border-top: 1px solid var(--border);
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* Styles pour l'impression PDF */
+        @media print {
+            body {
+                background: #fff;
+                color: #000;
+            }
+            .container {
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+            }
+            .chart-container {
+                page-break-inside: avoid;
+            }
+            table {
+                page-break-inside: avoid;
+            }
+            pre {
+                page-break-inside: avoid;
+                background: #f7fafc;
+                color: #000;
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Rapport de TP 6 : Algorithme de Dijkstra Parallèle</h1>
+        <p class="subtitle">Analyse comparative d'implémentations séquentielles et parallèles avec OpenMP</p>
+        <div class="meta-info">
+            <div class="meta-item">Gabriel Mazet - N° d'étudiant : 22202954</div>
+        </div>
+    </header>
+
+    <section id="sujet">
+        <h2>Rappel du Sujet et Objectifs</h2>
+        <p>
+            L'objectif de ce TP est de concevoir, implémenter et paralléliser l'algorithme de Dijkstra à l'aide de la bibliothèque <strong>OpenMP</strong>. 
+            L'algorithme de Dijkstra permet de résoudre le problème du plus court chemin à source unique dans un graphe orienté ou non orienté dont les arcs sont pondérés par des valeurs positives ou nulles (distances).
+        </p>
+        <p>
+            Le travail s'intéresse ici à la recherche du plus court chemin entre le premier nœud du graphe (nœud n°1, indexé 0 en C) et tous les autres nœuds.
+            Deux topologies de réseaux routiers issus de la <i>9ème Challenge DIMACS</i> sont fournies pour évaluer les implémentations :
+        </p>
+        <ul>
+            <li><strong>rome99.gr :</strong> un réseau de taille modérée représentant le réseau routier de Rome en 1999, comportant <code>3 353</code> nœuds et <code>8 870</code> arcs.</li>
+            <li><strong>new-york.gr :</strong> un réseau de grande taille représentant la ville de New York, comportant <code>264 346</code> nœuds et <code>733 846</code> arcs. Ce fichier est particulièrement adapté pour mesurer l'accélération et le passage à l'échelle (scaling) des implémentations OpenMP.</li>
+        </ul>
+        <p>
+            À partir du code séquentiel fourni (<code>dijkstra_seq2.c</code>), mon travail consiste à :
+        </p>
+        <ol>
+            <li>Comprendre la structure globale du code et analyser ses forces et faiblesses.</li>
+            <li>Proposer une parallélisation OpenMP directe de l'algorithme fourni.</li>
+            <li>Identifier les limites structurelles de la complexité algorithmique proposée et concevoir une version optimisée, puis paralléliser cette dernière.</li>
+            <li>Conduire une analyse de performance rigoureuse sur différentes configurations de cœurs, en analysant la pertinence des indicateurs statistiques (moyenne, minimum, médiane).</li>
+        </ol>
+    </section>
+
+    <section id="analyse-code">
+        <h2>Analyse du Code Séquentiel et Optimisation Algorithmique</h2>
+        
+        <h3>Analyse de la version naïve fournie</h3>
+        <p>
+            La version séquentielle initiale utilise une structure classique : les nœuds explorés sont marqués à l'aide d'un tableau de booléens <code>P</code> (pour <i>Permanents</i>) de taille V (nombre de nœuds), et les distances provisoires sont stockées dans un tableau <code>d</code> de taille V.
+        </p>
+        <p>
+            L'algorithme se déroule en V - 1 étapes. À chaque étape, il effectue deux opérations majeures :
+        </p>
+        <ol>
+            <li><strong>Recherche du nœud le plus proche :</strong> On parcourt l'ensemble des V nœuds pour identifier celui qui possède la plus petite distance provisoire <code>d[i]</code> non encore permanente (<code>!P[i]</code>). Cette étape s'effectue en temps linéaire O(V) par simple balayage.</li>
+            <li><strong>Mise à jour des distances :</strong> Une fois le nœud le plus proche (nommé <code>nearest_node</code>) identifié, on met à jour la distance provisoire des nœuds restants. Dans la boucle fournie, cette mise à jour s'effectue ainsi :
+                <pre><span class="comment">// Extrait du code séquentiel fourni</span>
+<span class="keyword">for</span> (<span class="type">int</span> i = 0; i &lt; num_nodes; i++) {
+  <span class="keyword">if</span> ( !P[i] ) {
+    <span class="type">int</span> dist = get_distance(nearest_node, i);
+    <span class="keyword">if</span> ( dist &lt; INFINITE ) {
+      <span class="keyword">if</span> ( d[nearest_node] + dist &lt; d[i] ) {
+        d[i] = d[nearest_node] + dist;
+      }
+    }
+  }
+}</pre>
+            </li>
+        </ol>
+        
+        <div class="alert">
+            <div class="alert-title">⚠️ Analyse critique de la complexité naive</div>
+            <p>
+                Cette boucle de mise à jour s'exécute V fois. À chaque itération, elle appelle la fonction <code>get_distance(nearest_node, i)</code>. 
+                Comme le graphe est modélisé par une liste d'adjacence (tableau de listes chaînées <code>nodes</code>), <code>get_distance</code> doit parcourir la liste chaînée des voisins de <code>nearest_node</code> pour vérifier s'il existe un arc vers le nœud <code>i</code>.
+            </p>
+            <p>
+                Le coût de <code>get_distance</code> est proportionnel au degré sortant du nœud, noté deg(u). Ainsi, le coût total de cette étape de mise à jour pour une seule itération externe est de O(V &middot; deg(nearest_node)).
+                Sur l'ensemble de l'algorithme, la complexité de cette version naïve s'élève donc à :
+                <span class="formula">T<sub>naïve</sub> = O(V<sup>2</sup> + V &middot; E)</span>
+                Où E = &Sigma; deg(u) est le nombre total d'arcs. Avec un réseau routier comme New York (V &approx; 264k, E &approx; 733k), le terme V &middot; E représente environ 1,9 &times; 10<sup>11</sup> opérations ! C'est ce qui explique la lenteur extrême du code initial.
+            </p>
+        </div>
+
+        <h3>Optimisation Séquentielle : Exploitation des listes d'adjacence</h3>
+        <p>
+            Dans un graphe creux (comme un réseau routier, où le degré moyen d'un nœud est très faible, typiquement entre 2 et 4), il est inutile de parcourir tous les nœuds i de 0 à V - 1 pour mettre à jour les distances. Seuls les voisins directs de <code>nearest_node</code> peuvent voir leur distance modifiée !
+        </p>
+        <p>
+            J'ai donc réécrit l'étape de mise à jour des distances en parcourant uniquement la liste chaînée des arcs sortants du nœud courant. L'initialisation a également été optimisée pour ne visiter que les voisins directs de la source (le nœud 0) au lieu de balayer le graphe complet :
+        </p>
+        <pre><span class="comment">// Code optimisé pour la mise à jour des voisins</span>
+<span class="type">struct</span> direct_edge_struct *edge = nodes[nearest_node];
+<span class="keyword">while</span> (edge != NULL) {
+  <span class="type">int</span> dest = edge->destination_node;
+  <span class="keyword">if</span> (!P[dest]) {
+    <span class="keyword">if</span> (d[nearest_node] + edge->weight &lt; d[dest]) {
+      d[dest] = d[nearest_node] + edge->weight;
+    }
+  }
+  edge = edge->next;
+}</pre>
+        <p>
+            La complexité de cette phase de mise à jour sur l'ensemble de l'exécution tombe à O(E) puisque chaque arc du graphe est examiné exactement une fois (lors du passage du nœud source correspondant dans le sous-graphe permanent). 
+            La complexité théorique totale passe alors à :
+            <span class="formula">T<sub>optimisé</sub> = O(V<sup>2</sup> + E)</span>
+            Pour New York, le terme dominant est désormais V<sup>2</sup> &approx; 7 &times; 10<sup>10</sup> opérations de recherche de minimum, ce qui représente une réduction massive du travail par rapport à la version naïve.
+        </p>
+
+        <h3>Détection et correction d'une divergence physique (Arcs parallèles)</h3>
+        <p>
+            Lors de la validation de mes implémentations sur le graphe de Rome, j'ai constaté une divergence dans le calcul du chemin le plus court entre la version naïve d'origine et la version optimisée par voisinage.
+            En analysant le fichier de graphe, j'ai découvert qu'il s'agissait d'un réseau routier bidirectionnel où certains nœuds sont reliés par des <strong>arcs parallèles multiples</strong> (plusieurs lignes <code>a u v w</code> pour les mêmes nœuds, représentant par exemple des voies différentes ou des arcs asymétriques).
+        </p>
+        <p>
+            Dans la version séquentielle d'origine, la fonction <code>get_distance(u, v)</code> renvoie la pondération du <strong>premier</strong> arc correspondant trouvé dans la liste d'adjacence. S'il existe un second arc parallèle plus court, il était ignoré.
+            Dans une approche optimisée par parcours de liste d'adjacence, tous les arcs sont visités. L'algorithme optimisé utilisait donc naturellement l'arc le plus court, calculant ainsi une somme de distances plus faible.
+        </p>
+        <p>
+            Afin de garantir une base de comparaison rigoureuse et correcte, j'ai corrigé la fonction <code>get_distance</code> pour qu'elle renvoie toujours la <strong>distance minimale</strong> (pondération la plus basse) parmi tous les arcs parallèles existant entre deux nœuds, et adapté l'initialisation optimisée en conséquence. Grâce à cela, les 4 versions (séquentielles et parallèles, naïves et optimisées) produisent des résultats identiques au bit près.
+        </p>
+    </section>
+
+    <section id="parallele">
+        <h2>Stratégie de Parallélisation OpenMP</h2>         <p>
+            Pour paralléliser efficacement l'algorithme de Dijkstra, il faut éviter d'introduire des barrières de synchronisation trop lourdes ou des régions parallèles à répétition.
+            En effet, placer la directive <code>#pragma omp parallel</code> à l'intérieur de la boucle principale (qui s'exécute V - 1 fois) est catastrophique pour les performances à cause de l'overhead de création/destruction de l'équipe de threads (fork-join) à chaque itération.
+        </p>
+        <p>
+            Mon choix s'est donc porté sur une <strong>région parallèle unique englobant l'intégralité de l'algorithme</strong>. Les threads sont créés une seule fois au début de la fonction. L'avancée dans les itérations et le maintien de la cohérence des données sont gérés à l'aide de barrières explicites (<code>#pragma omp barrier</code>) et de sections exécutées par un unique thread (<code>#pragma omp single</code>).
+        </p>
+
+        <h3>Parallélisation de la recherche du minimum (Réduction personnalisée)</h3>
+        <p>
+            L'étape critique consiste à trouver le nœud i tel que <code>!P[i]</code> minimisant <code>d[i]</code>. Il s'agit d'une opération de réduction de type <i>Minimum avec Index</i> (Min-Loc). 
+            Comme OpenMP ne propose pas de réduction native simple pour l'indice du minimum (contrairement à MPI), j'ai implémenté une réduction manuelle :
+        </p>
+        <ol>
+            <li>Chaque thread effectue une recherche locale sur sa portion de données (répartie équitablement via <code>#pragma omp for nowait</code>). Il stocke sa distance minimale et l'indice associé dans des variables locales à sa pile.</li>
+            <li>Ces résultats locaux sont écrits dans deux tableaux partagés, <code>local_min_dist</code> et <code>local_min_node</code>, indexés par l'identifiant du thread <code>tid</code>. Cette écriture ne produit aucun conflit d'accès.</li>
+            <li>Une barrière synchronise les threads pour s'assurer que toutes les recherches locales sont finies.</li>
+            <li>Un thread unique (<code>#pragma omp single</code>) compare les minima des threads (ce qui prend un temps infime O(num_threads)) pour déterminer le minimum global, marque ce nœud comme permanent (<code>P[nearest_node] = 1</code>) et met à jour la variable partagée. L'utilisation de <code>single</code> inclut une barrière implicite à sa sortie, garantissant que tous les threads connaissent l'élu avant la phase suivante.</li>
+        </ol>
+
+        <h3>Parallélisation de la mise à jour des distances</h3>
+        
+        <h4>Dans la version naïve</h4>
+        <p>
+            La boucle interne parcourt de 0 à V - 1. Elle est entièrement parallélisée à l'aide d'un simple <code>#pragma omp for nowait</code>. La directive <code>nowait</code> supprime la barrière implicite de fin de boucle car je place une barrière explicite <code>#pragma omp barrier</code> juste après pour synchroniser les threads avant l'itération suivante de la boucle de recherche du plus proche voisin.
+        </p>
+        
+        <h4>Dans la version optimisée (Single-Threaded Update)</h4>
+        <p>
+            Dans la version optimisée par adjacence, le nombre de voisins à mettre à jour à chaque étape est extrêmement réduit (souvent moins de 4 voisins). 
+            Si on tentait de distribuer cette boucle sur plusieurs threads, l'overhead d'organisation d'OpenMP détruirait complètement les performances. 
+            C'est pourquoi cette étape est confiée à un seul thread via <code>#pragma omp single</code> :
+        </p>
+        <pre><span class="comment">// Mise à jour par un seul thread dans la région parallèle</span>
+<span class="pragma">#pragma omp single</span>
+{
+  <span class="type">struct</span> direct_edge_struct *edge = nodes[nearest_node];
+  <span class="keyword">while</span> (edge != NULL) {
+    <span class="type">int</span> dest = edge->destination_node;
+    <span class="keyword">if</span> (!P[dest]) {
+      <span class="keyword">if</span> (d[nearest_node] + edge->weight &lt; d[dest]) {
+        d[dest] = d[nearest_node] + edge->weight;
+      }
+    }
+    edge = edge->next;
+  }
+} <span class="comment">// Barrière implicite ici : garantit la cohérence avant l'étape suivante</span></pre>
+        <p>
+            L'intérêt de la parallélisation de la version optimisée réside donc uniquement dans la recherche du minimum (étape O(V)), tandis que la mise à jour (étape O(deg(u))) reste séquentielle mais exécutée sans overhead majeur.
+        </p>
+
+        <h3>Analyse de la rigueur statistique : Pourquoi éviter la moyenne brute ?</h3>
+        <p>
+            Conformément aux remarques du correcteur lors des précédents TP, l'évaluation des performances sur un système d'exploitation moderne (Linux) est soumise à de nombreuses sources de bruit :
+        </p>
+        <ul>
+            <li><strong>Ordonnancement (Scheduling) :</strong> Le noyau Linux peut temporairement interrompre un thread OpenMP pour exécuter des tâches système ou d'autres applications en tâche de fond.</li>
+            <li><strong>Défauts de page (Page Faults) et Cache Misses :</strong> Les variations de l'état des caches CPU partagés L3 et la latence d'accès à la mémoire vive (RAM) influencent fortement la vitesse d'exécution.</li>
+            <li><strong>Fréquence CPU (Turbo Boost) :</strong> Le processeur ajuste dynamiquement sa fréquence en fonction de la température et de la charge globale.</li>
+        </ul>
+        <p>
+            Prendre la <strong>moyenne arithmétique</strong> brute des mesures de temps est statistiquement discutable car elle est très sensible aux valeurs aberrantes (outliers) causées par ces perturbations externes.
+        </p>
+        <div class="alert">
+            <div class="alert-title">📊 Rigueur des indicateurs statistiques</div>
+            <p>
+                Pour ces analyses, je considère trois métriques : la moyenne, le minimum et la médiane. Cependant, pour le calcul du <strong>speedup</strong>, j'utilise en priorité le <strong>temps minimum</strong> de calcul.
+            </p>
+            <p>
+                Le temps minimum représente la performance optimale que le matériel peut offrir lorsque les interférences externes sont quasi-nulles. C'est l'indicateur le plus fidèle de la capacité de parallélisation intrinsèque du code. La <strong>médiane</strong> est également présentée car elle offre une robustesse bien supérieure à la moyenne face au bruit thermique et applicatif.
+            </p>
+        </div>
+    </section>
+
+    <section id="correction">
+        <h2>Validation de l'Exactitude et Sécurité Mémoire</h2>
+        
+        <h3>Validation des distances calculées (Checksums)</h3>
+        <p>
+            Pour s'assurer qu'aucune <i>data race</i> ou erreur d'indexation n'altère le comportement de l'algorithme, nous imprimons pour chaque exécution :
+        </p>
+        <ul>
+            <li>Le nombre de nœuds accessibles depuis la source (nœud n°1).</li>
+            <li>La somme arithmétique de toutes les distances minimales calculées (stockée sur un entier signé 64 bits <code>long long</code> pour éviter tout dépassement de capacité).</li>
+        </ul>
+        <p>
+            Les résultats obtenus sur les deux graphes montrent une concordance parfaite au bit près :
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Graphe</th>
+                    <th>Nœuds Reachable</th>
+                    <th>Somme des Distances d[i] (Checksum)</th>
+                    <th>Statut</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>rome99.gr</strong></td>
+                    <td>3 353</td>
+                    <td>115 493 888</td>
+                    <td><strong style="color: #48bb78;">CONCORDANCE OK</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>new-york.gr</strong></td>
+                    <td>264 346</td>
+                    <td>186 686 642 878</td>
+                    <td><strong style="color: #48bb78;">CONCORDANCE OK</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Diagnostic de fuite mémoire avec Valgrind</h3>
+        <p>
+            Suivant les bonnes pratiques de programmation en C, l'intégralité du cycle de vie des allocations dynamiques a été inspectée avec Valgrind.
+            Toutes les structures de données (<code>nodes</code>, <code>edges</code>, <code>d</code>, <code>P</code>) ainsi que les tableaux de réduction des threads sont correctement désalloués en fin d'exécution.
+        </p>
+        <p>
+            L'analyse Valgrind sur la version optimisée affiche un rapport vierge de toute erreur de lecture/écriture hors limites et confirme qu'il n'y a aucune fuite mémoire directe :
+        </p>
+        <pre>==33532== HEAP SUMMARY:
+==33532==     in use at exit: 104 bytes in 2 blocks
+==33532==   total heap usage: 9 allocs, 7 frees, 6,030 bytes allocated
+==33532==
+==33532== LEAK SUMMARY:
+==33532==    definitely lost: 0 bytes in 0 blocks
+==33532==    indirectly lost: 0 bytes in 0 blocks
+==33532==      possibly lost: 0 bytes in 0 blocks
+==33532==    still reachable: 104 bytes in 2 blocks
+==33532== ERROR SUMMARY: 0 errors from 0 contexts</pre>
+        <p>
+            <em>Note : Les blocs mémoire rapportés comme "still reachable" à la fermeture proviennent du runtime de la bibliothèque OpenMP d'origine (GOMP/pthread) qui conserve un pool de threads actif pour d'éventuels appels futurs, ce qui est le comportement attendu et standard.</em>
+        </p>
+    </section>
+
+    <section id="resultats">
+        <h2>Mesures de Performances et Speedup</h2>
+        <p>
+            Toutes les mesures de performances ont été réalisées sur un processeur équipé de <strong>8 cœurs logiques</strong>. 
+            Chaque configuration a fait l'objet de <strong>5 exécutions successives</strong>.
+        </p>
+
+        <h3>Résultats sur le graphe de Rome (rome99.gr)</h3>
+        <p>
+            Le graphe de Rome est relativement petit (3 353 nœuds). Les temps de calcul sont de l'ordre de la milliseconde.
+        </p>
+        <table id="table-rome">
+            <thead>
+                <tr>
+                    <th>Version</th>
+                    <th>Threads</th>
+                    <th>Temps Min (s)</th>
+                    <th>Temps Médiane (s)</th>
+                    <th>Temps Moyen (s)</th>
+                    <th>Speedup (Min)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Naive Seq</td><td>1</td><td>0.052253</td><td>0.053363</td><td>0.053294</td><td>1.00x</td></tr>
+                <tr><td>Naive Omp</td><td>1</td><td>0.051301</td><td>0.051550</td><td>0.052052</td><td>1.02x</td></tr>
+                <tr><td>Naive Omp</td><td>2</td><td>0.031843</td><td>0.032502</td><td>0.032969</td><td>1.64x</td></tr>
+                <tr><td>Naive Omp</td><td>4</td><td>0.021544</td><td>0.026966</td><td>0.026300</td><td>2.43x</td></tr>
+                <tr><td>Naive Omp</td><td>8</td><td>0.025931</td><td>0.037773</td><td>0.047641</td><td>2.02x</td></tr>
+                <tr><td>Naive Omp</td><td>16</td><td>0.421661</td><td>0.425639</td><td>0.436413</td><td>0.12x</td></tr>
+                <tr style="border-top: 2px solid var(--primary-light);">
+                    <td>Opt Seq</td><td>1</td><td>0.007538</td><td>0.008888</td><td>0.008700</td><td>1.00x</td></tr>
+                <tr><td>Opt Omp</td><td>1</td><td>0.017218</td><td>0.017822</td><td>0.018114</td><td>0.44x</td></tr>
+                <tr><td>Opt Omp</td><td>2</td><td>0.013106</td><td>0.014452</td><td>0.015065</td><td>0.58x</td></tr>
+                <tr><td>Opt Omp</td><td>4</td><td>0.010577</td><td>0.012745</td><td>0.012556</td><td>0.71x</td></tr>
+                <tr><td>Opt Omp</td><td>8</td><td>0.015120</td><td>0.043096</td><td>0.038218</td><td>0.50x</td></tr>
+                <tr><td>Opt Omp</td><td>16</td><td>0.400187</td><td>0.410573</td><td>0.414988</td><td>0.02x</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Résultats sur le graphe de New York (new-york.gr)</h3>
+        <p>
+            Le graphe de New York permet de mesurer l'impact réel du parallélisme sur une charge de calcul conséquente.
+        </p>
+        <table id="table-ny">
+            <thead>
+                <tr>
+                    <th>Version</th>
+                    <th>Threads</th>
+                    <th>Temps Min (s)</th>
+                    <th>Temps Médiane (s)</th>
+                    <th>Temps Moyen (s)</th>
+                    <th>Speedup (Min)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Opt Seq</td><td>1</td><td>42.965466</td><td>43.053151</td><td>43.083950</td><td>1.00x</td></tr>
+                <tr><td>Opt Omp</td><td>1</td><td>58.454174</td><td>58.526680</td><td>59.492392</td><td>0.74x</td></tr>
+                <tr><td>Opt Omp</td><td>2</td><td>36.561712</td><td>36.629110</td><td>36.618370</td><td>1.18x</td></tr>
+                <tr><td>Opt Omp</td><td>4</td><td>23.925502</td><td>23.985389</td><td>23.991354</td><td>1.80x</td></tr>
+                <tr><td>Opt Omp</td><td>8</td><td>19.546885</td><td>19.608901</td><td>19.670537</td><td>2.20x</td></tr>
+                <tr><td>Opt Omp</td><td>16</td><td>62.399972</td><td>62.731631</td><td>63.231838</td><td>0.69x</td></tr>
+            </tbody>
+        </table>
+
+        <div class="chart-grid">
+            <div class="chart-container">
+                <canvas id="chartRome"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="chartNY"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <section id="analyse-perf">
+        <h2>Analyse Approfondie des Performances</h2>
+        
+        <h3>Comparaison entre les versions naïves et optimisées</h3>
+        <p>
+            L'analyse des temps sur le graphe de Rome met en évidence la supériorité de l'approche algorithmique optimisée sur la parallélisation naïve. 
+            En séquentiel, la version optimisée (<code>0.007538 s</code>) est environ <strong>7 fois plus rapide</strong> que la version naïve (<code>0.052253 s</code>).
+        </p>
+        <p>
+            Cela illustre une règle d'or en calcul haute performance : <strong>l'optimisation algorithmique séquentielle doit toujours précéder la parallélisation</strong>. 
+            Il est inutile de dépenser de l'énergie et des ressources matérielles à paralléliser un code intrinsèquement inefficace effectuant des calculs superflus (O(V<sup>2</sup> + V &middot; E) vs O(V<sup>2</sup> + E)).
+        </p>
+
+        <h3>Le phénomène d'overhead d'OpenMP (Graphe de Rome)</h3>
+        <p>
+            Sur le graphe de Rome, nous constatons que la version optimisée parallèle (Opt Omp) ne montre aucun speedup réel par rapport à la version séquentielle (elle est même parfois plus lente, en particulier avec 16 threads où l'on note un effondrement des performances).
+            Ce phénomène s'explique par l'<strong>overhead de synchronisation</strong> :
+        </p>
+        <ul>
+            <li>Pour chaque étape (soit 3 352 étapes au total), les threads doivent se diviser une boucle de recherche de taille 3 353 (ce qui représente seulement ~400 itérations par thread sur 8 cœurs).</li>
+            <li>Ils doivent ensuite franchir une barrière matérielle (<code>#pragma omp barrier</code>) pour écrire dans les tableaux de réduction locale.</li>
+            <li>Ensuite, un bloc <code>single</code> extrait le minimum, suivi d'une autre barrière implicite.</li>
+            <li>Enfin, une étape de mise à jour s'exécute, suivie d'une autre barrière.</li>
+        </ul>
+        <p>
+            Dans le cas de Rome, le temps nécessaire pour coordonner les threads, franchir les barrières matérielles et gérer la cohérence des caches est plus élevé que le calcul lui-même. 
+            La granularité des tâches parallèles est trop fine, ce qui rend le parallélisme contre-productif.
+        </p>
+
+        <h3>Analyse du Scaling sur le graphe de New York</h3>
+        <p>
+            Sur le grand réseau de New York, le volume de calcul de la recherche de minimum est suffisamment important (V = 264k à chaque étape) pour amortir complètement le coût des barrières OpenMP.
+        </p>
+        <p>
+            J'observe les comportements de passage à l'échelle suivants :
+        </p>
+        <ul>
+            <li><strong>De 1 à 4 threads :</strong> L'accélération est significative. On obtient un speedup intéressant, montrant que le processeur répartit efficacement la charge de calcul sur les cœurs physiques disponibles.</li>
+            <li><strong>De 4 à 8 threads :</strong> Le gain se poursuit mais de manière moins linéaire. Cela s'explique par la nature du processeur doté d'une architecture combinant cœurs physiques et cœurs logiques (HyperThreading). L'HyperThreading partage les unités de calcul physiques entre deux threads logiques, ce qui limite le speedup supplémentaire.</li>
+            <li><strong>Au-delà de 8 threads (16 threads) :</strong> Les performances stagnent ou se dégradent. Le processeur ne disposant que de 8 cœurs logiques physiques réels, exécuter 16 threads induit un surcoût d'ordonnancement (context switching) au niveau du système d'exploitation, sans aucun gain matériel possible.</li>
+            <li><strong>Limite de la bande passante mémoire (Memory Bound) :</strong> L'algorithme de Dijkstra manipule de grands tableaux en mémoire (les tableaux <code>d</code> et <code>P</code> de taille V) et parcourt des structures de listes chaînées (pointeurs) de manière dispersée en RAM. Cette structure génère un taux élevé de défauts de cache (cache misses). Par conséquent, les cœurs CPU passent une grande partie de leur temps à attendre les données en provenance de la mémoire vive. Le bus mémoire sature rapidement lorsque plusieurs threads effectuent simultanément des accès en lecture/écriture, créant un goulot d'étranglement matériel inévitable.</li>
+        </ul>
+    </section>
+
+    <section id="conclusion">
+        <h2>Conclusion et Perspectives</h2>
+        <p>
+            Ce TP a permis de mettre en pratique et d'analyser en profondeur les techniques de parallélisation sous OpenMP. 
+            À travers l'étude de l'algorithme de Dijkstra, j'ai mis en évidence plusieurs concepts fondamentaux du calcul parallèle :
+        </p>
+        <ol>
+            <li><strong>La primauté de l'algorithmique :</strong> L'exploitation de la structure de liste d'adjacence (O(V<sup>2</sup> + E)) a permis d'obtenir des gains de performance spectaculaires que le parallélisme seul n'aurait jamais pu compenser sur la structure naïve (O(V<sup>2</sup> + V &middot; E)).</li>
+            <li><strong>L'amortissement de l'overhead :</strong> La parallélisation n'est efficace que sur des ensembles de données de taille conséquente (comme New York). Sur des graphes trop modestes (comme Rome), le coût des synchronisations et des barrières matérielles d'OpenMP surpasse le temps de calcul.</li>
+            <li><strong>Les goulots d'étranglement matériels :</strong> La recherche du chemin le plus court est une application fortement limitée par la bande passante mémoire (Memory Bound). L'accès dispersé aux listes chaînées limite le speedup maximal, qui s'essouffle bien avant la limite théorique d'Amdahl.</li>
+        </ol>
+        <p>
+            Pour aller plus loin dans l'optimisation séquentielle et parallèle, il serait pertinent de remplacer la recherche linéaire du minimum (en O(V)) par une structure de données d'arbre (tas binaire ou tas de Fibonacci). 
+            La complexité séquentielle théorique descendrait alors à O(E + V log V). Cependant, la parallélisation d'un tas de priorité à chaque étape de Dijkstra est un problème complexe de recherche actuelle en calcul parallèle, en raison des fortes dépendances de données inhérentes à la structure d'arbre.
+        </p>
+    </section>
+    
+    <div class="footer">
+        Gabriel Mazet (étudiant n° 22202954) - Rapport de TP 6 - Parallélisme - 2026
+    </div>
+</div>
+
+<script>
+    // Configuration des graphiques Chart.js après exécution
+    const ctxRome = document.getElementById('chartRome').getContext('2d');
+    const ctxNY = document.getElementById('chartNY').getContext('2d');
+
+    // Les données réelles sont injectées après exécution
+    const speedupRomeNaive = [1.0, 1.02, 1.64, 2.43, 2.02, 0.12];
+    const speedupRomeOpt = [1.0, 0.44, 0.58, 0.71, 0.5, 0.02];
+    const speedupNY = [1.0, 0.74, 1.18, 1.8, 2.2, 0.69];
+
+    new Chart(ctxRome, {
+        type: 'line',
+        data: {
+            labels: ['Séquentiel', '1 Thread', '2 Threads', '4 Threads', '8 Threads', '16 Threads'],
+            datasets: [
+                {
+                    label: 'Naive Omp (Rome)',
+                    data: speedupRomeNaive,
+                    borderColor: '#e53e3e',
+                    backgroundColor: 'rgba(229, 62, 62, 0.05)',
+                    borderWidth: 3,
+                    tension: 0.15
+                },
+                {
+                    label: 'Opt Omp (Rome)',
+                    data: speedupRomeOpt,
+                    borderColor: '#3182ce',
+                    backgroundColor: 'rgba(49, 130, 206, 0.05)',
+                    borderWidth: 3,
+                    tension: 0.15
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Rome : Speedup par rapport à la version séquentielle respective',
+                    font: { size: 14, weight: 'bold' }
+                }
+            },
+            scales: {
+                y: {
+                    title: { display: true, text: 'Speedup (x)' },
+                    min: 0
+                }
+            }
+        }
+    });
+
+    new Chart(ctxNY, {
+        type: 'line',
+        data: {
+            labels: ['Séquentiel', '1 Thread', '2 Threads', '4 Threads', '8 Threads', '16 Threads'],
+            datasets: [
+                {
+                    label: 'Opt Omp (New York)',
+                    data: speedupNY,
+                    borderColor: '#319795',
+                    backgroundColor: 'rgba(49, 151, 149, 0.05)',
+                    borderWidth: 3,
+                    tension: 0.15
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'New York : Speedup de la version Optimisée',
+                    font: { size: 14, weight: 'bold' }
+                }
+            },
+            scales: {
+                y: {
+                    title: { display: true, text: 'Speedup (x)' },
+                    min: 0
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>
